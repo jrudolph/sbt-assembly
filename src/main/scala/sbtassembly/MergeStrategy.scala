@@ -39,24 +39,24 @@ object MergeStrategy {
     }
     file
   }
-  val first: MergeStrategy = new MergeStrategy {
+  case object first extends MergeStrategy {
     val name = "first"
     def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] =
       Right(Seq(files.head -> path))
   }
-  val last: MergeStrategy = new MergeStrategy {
+  case object last extends MergeStrategy {
     val name = "last"
     def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] =
       Right(Seq(files.last -> path))
   }
-  val singleOrError: MergeStrategy = new MergeStrategy {
+  case object singleOrError extends MergeStrategy {
     val name = "singleOrError"
     def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] =
       if (files.size == 1) Right(Seq(files.head -> path))
       else Left("found multiple files for same target path:" +
         filenames(tempDir, files).mkString("\n", "\n", ""))
   }
-  val concat: MergeStrategy = new MergeStrategy {
+  case object concat extends MergeStrategy {
     val name = "concat"
     def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
       val file = createMergeTarget(tempDir, path)
@@ -72,7 +72,7 @@ object MergeStrategy {
       }
     }
   }
-  val filterDistinctLines: MergeStrategy = new MergeStrategy {
+  case object filterDistinctLines extends MergeStrategy {
     val name = "filterDistinctLines"
     def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
       val lines = files flatMap (IO.readLines(_, IO.utf8))
@@ -82,7 +82,7 @@ object MergeStrategy {
       Right(Seq(file -> path))
     }
   }
-  val deduplicate: MergeStrategy = new MergeStrategy {
+  case object deduplicate extends MergeStrategy {
     val name = "deduplicate"
     def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] =
       if (files.size == 1) Right(Seq(files.head -> path))
@@ -95,7 +95,7 @@ object MergeStrategy {
     override def detailLogLevel = Level.Debug
     override def summaryLogLevel = Level.Info
   }
-  val rename: MergeStrategy = new MergeStrategy {
+  case object rename extends MergeStrategy {
     val name = "rename"
     def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] =
       Right(files flatMap { f =>
@@ -119,7 +119,7 @@ object MergeStrategy {
 
     override def notifyThreshold = 1
   }
-  val discard: MergeStrategy = new MergeStrategy {
+  case object discard extends MergeStrategy {
     val name = "discard"
     def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] =
       Right(Nil)   
