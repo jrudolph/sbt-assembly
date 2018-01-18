@@ -3,11 +3,28 @@ package sbtassembly
 import sbt._
 import Keys._
 import java.security.MessageDigest
-import java.io.{IOException, PrintWriter, FileOutputStream, File}
+import java.io.{File, FileOutputStream, IOException, PrintWriter}
+import java.util.jar.JarEntry
+import java.util.jar.JarOutputStream
+import java.util.zip.CRC32
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
 import scala.collection.mutable
 import Def.Initialize
 import PluginCompat._
+import sbt.File
+import sbt.IO.allDirectoryPaths
+import sbt.IO.archive
+import sbt.IO.createDirectory
+import sbt.IO.normalizeName
+import sbt.IO.transfer
+import sbt.IO.withZipOutput
+import sbt.Package.sourcesDebugString
 
+import scala.collection.immutable.TreeSet
+
+case class FileEntry(sourcePackage: Option[File], extractedFile: File, path: String)
 object Assembly {
   import AssemblyPlugin.autoImport.{ Assembly => _, _ }
 
@@ -21,10 +38,24 @@ object Assembly {
     import FileInfo.{hash, exists}
     import java.util.jar.{Attributes, Manifest}
 
-    lazy val (ms: Vector[(File, String)], stratMapping: List[(String, MergeStrategy)]) = {
+    lazy val (ms: Vector[FileEntry], stratMapping: List[(String, MergeStrategy)]) = {
       log.info("Merging files...")
       applyStrategies(mappings, ao.mergeStrategy, ao.assemblyDirectory, log)
     }
+    def createJar(sources: Seq[FileEntry], jar: File, manifest: Manifest, log: Logger): Unit = {
+      val path = jar.getAbsolutePath
+      log.info("Packaging " + path + " ...")
+      if (jar.exists)
+        if (jar.isFile)
+          IO.delete(jar)
+        else
+          sys.error(path + " exists, but is not a regular file")
+
+      IO2.jar(sources, jar, manifest)
+
+      log.info("Done packaging.")
+    }
+
     def makeJar(outPath: File) {
       import Package._
       import collection.JavaConverters._
@@ -38,7 +69,7 @@ object Assembly {
           case _                              => log.warn("Ignored unknown package option " + option)
         }
       }
-      Package.makeJar(ms, outPath, manifest, log)
+      createJar(ms, outPath, manifest, log)
       ao.prependShellScript foreach { shellScript: Seq[String] =>
         val tmpFile = cacheDir / "assemblyExec.tmp"
         if (tmpFile.exists()) tmpFile.delete()
@@ -95,24 +126,26 @@ object Assembly {
   }
 
   def applyStrategies(srcSets: Seq[MappingSet], strats: String => MergeStrategy,
-      tempDir: File, log: Logger): (Vector[(File, String)], List[(String, MergeStrategy)]) = {
+      tempDir: File, log: Logger): (Vector[FileEntry], List[(String, MergeStrategy)]) = {
     import org.scalactic._
     import org.scalactic.Accumulation._
 
-    val srcs = srcSets.flatMap( _.mappings )
+    val srcs = srcSets.flatMap( sets => sets.mappings.map {
+      case (extracted, path) => FileEntry(sets.sourcePackage, extracted, path)
+    } )
     val counts = scala.collection.mutable.Map[MergeStrategy, Int]().withDefaultValue(0)
     (tempDir * "sbtMergeTarget*").get foreach { x => IO.delete(x) }
-    def applyStrategy(strategy: MergeStrategy, name: String, files: Seq[(File, String)]): Seq[(File, String)] Or ErrorMessage = {
-      if (files.size >= strategy.notifyThreshold) {
+    def applyStrategy(strategy: MergeStrategy, name: String, files: Seq[FileEntry]): Seq[FileEntry] Or ErrorMessage = {
+      ???/*if (files.size >= strategy.notifyThreshold) {
         log.log(strategy.detailLogLevel, "Merging '%s' with strategy '%s'".format(name, strategy.name))
         counts(strategy) += 1
       }
       strategy((tempDir, name, files map (_._1))) match {
         case Right(f) => Good(f)
         case Left(err) => Bad(strategy.name + ": " + err)
-      }
+      }*/
     }
-    val renamed: Seq[(File, String)] = srcs.groupBy(_._2).toVector.map { case (name, files) =>
+    val renamed: Seq[FileEntry] = srcs.groupBy(_.path).toVector.map { case (name, files) =>
       val strategy = strats(name)
       if (strategy == MergeStrategy.rename) applyStrategy(strategy, name, files).accumulating
       else Good(files)
@@ -126,7 +159,7 @@ object Assembly {
     }
     // this step is necessary because some dirs may have been renamed above
     val cleaned: Seq[(File, String)] = renamed filter { pair =>
-      (!pair._1.isDirectory) && pair._1.exists
+      (!pair.extractedFile.isDirectory) && pair.extractedFile<.exists
     }
     val stratMapping = new mutable.ListBuffer[(String, MergeStrategy)]
     val mod: Seq[(File, String)] = cleaned.groupBy(_._2).toVector.sortBy(_._1).map { case (name, files) =>
