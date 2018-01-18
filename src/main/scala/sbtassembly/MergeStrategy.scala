@@ -11,7 +11,7 @@ import Assembly.{ sha1string, sha1content }
  * packaging) and the sequence of source files, and it shall return the
  * file to be included in the assembly (or throw an exception).
  */
-abstract class MergeStrategy extends Function1[(File, String, Seq[File]), Either[String, Seq[(File, String)]]] {
+abstract class MergeStrategy extends ((File, String, Seq[File]) => Either[String, Seq[(File, String)]]) {self: Product =>
   def name: String
   def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]]
   def notifyThreshold = 2
@@ -19,6 +19,8 @@ abstract class MergeStrategy extends Function1[(File, String, Seq[File]), Either
   def summaryLogLevel = Level.Warn
   final def apply(args: (File, String, Seq[File])): Either[String, Seq[(File, String)]] =
     apply(args._1, args._2, args._3)
+
+  override def toString(): String = s"MergeStrategy.$productPrefix"
 }
 
 object MergeStrategy {

@@ -235,6 +235,13 @@ object Assembly {
     retval.toVector
   }
 
+  def assemblyTask2(key: TaskKey[File]): Initialize[Task[File]] = Def.task {
+    val t = (test in key).value
+    val s = (streams in key).value
+    FastAssembly(
+      (assemblyOutputPath in key).value, (assemblyOption in key).value,
+      (packageOptions in key).value, (fullClasspath in assembly).value, s.log)
+  }
   def assemblyTask(key: TaskKey[File]): Initialize[Task[File]] = Def.task {
     val t = (test in key).value
     val s = (streams in key).value

@@ -5,6 +5,7 @@ import Keys._
 
 trait AssemblyKeys {
   lazy val assembly                  = taskKey[File]("Builds a deployable fat jar.")
+  lazy val fastAssembly                  = taskKey[File]("Builds a deployable fat jar (fast).")
   lazy val assembleArtifact          = settingKey[Boolean]("Enables (true) or disables (false) assembling an artifact.")
   lazy val assemblyOption            = taskKey[AssemblyOption]("Configuration for making a deployable fat jar.")
   lazy val assembledMappings         = taskKey[Seq[MappingSet]]("Keeps track of jar origins for each source.")

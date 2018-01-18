@@ -23,6 +23,7 @@ object AssemblyPlugin extends sbt.AutoPlugin {
 
   lazy val baseAssemblySettings: Seq[sbt.Def.Setting[_]] = Seq(
     assembly := Assembly.assemblyTask(assembly).value,
+    fastAssembly := Assembly.assemblyTask2(assembly).value,
     logLevel in assembly := Level.Info,
     assembledMappings in assembly                   := Assembly.assembledMappingsTask(assembly).value,
     assemblyPackageScala                            := Assembly.assemblyTask(assemblyPackageScala).value,
