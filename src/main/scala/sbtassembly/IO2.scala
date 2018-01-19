@@ -507,21 +507,25 @@ object IO2 {
       e
     }
     def addFileEntry(entry: FileEntry): Unit = {
-      val (is: InputStream, lastModified: Long) = entry.sourcePackage match {
+
+
+      val (withInputStream: ((InputStream => Unit) => Unit), lastModified: Long) = entry.sourcePackage match {
         case Some(jar) if jar.name.endsWith(".jar") =>
           val jarFile = new JarFile(jar)
-          try {
-            val jarEntry = jarFile.getEntry(entry.path)
-            (jarFile.getInputStream(jarEntry), jarEntry.getLastModifiedTime.toMillis)
-          }
+          val jarEntry = jarFile.getEntry(entry.path)
+          val lastModified = jarEntry.getTime
+
+          def withInputStream(f: InputStream => Unit): Unit = {
+            try f(jarFile.getInputStream(jarEntry))
             finally jarFile.close()
+          }
+
+          (withInputStream _, lastModified)
         case None =>
-          (new FileInputStream(entry.extractedFile), entry.extractedFile.lastModified)
+          ((f: InputStream => Unit) => f(new FileInputStream(entry.extractedFile)), entry.extractedFile.lastModified)
       }
-
       output putNextEntry makeFileEntry(lastModified, entry.path)
-
-      transfer(is, output)
+      withInputStream(transfer(_, output))
       output.closeEntry()
     }
 

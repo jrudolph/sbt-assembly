@@ -140,10 +140,13 @@ object Assembly {
         log.log(strategy.detailLogLevel, "Merging '%s' with strategy '%s'".format(name, strategy.name))
         counts(strategy) += 1
       }
-      strategy((tempDir, name, files map (_.extractedFile))) match {
-        case Right(fs) => Good(fs.map(f => FileEntry(None, f._1, f._2)))
-        case Left(err) => Bad(strategy.name + ": " + err)
-      }
+      if (strategy == MergeStrategy.deduplicate && files.size == 1)
+        Good(files)
+      else
+        strategy((tempDir, name, files map (_.extractedFile))) match {
+          case Right(fs) => Good(fs.map(f => FileEntry(None, f._1, f._2)))
+          case Left(err) => Bad(strategy.name + ": " + err)
+        }
     }
     val renamed: Seq[FileEntry] = srcs.groupBy(_.path).toVector.map { case (name, files) =>
       val strategy = strats(name)
